@@ -1,0 +1,4 @@
+Documento sintético de prueba
+
+Este archivo es un ejemplo público sin datos personales.
+Servirá para comprobar la lectura de texto, el procesamiento local y la exportación de resultados.

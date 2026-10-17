@@ -1,0 +1,2 @@
+# Rango inicial. Fijar la versión tras comprobar la API al comenzar el desarrollo.
+langchain-core>=1.0,<2.0
