@@ -36,7 +36,7 @@ function addFiles(incoming) {
   if (busy) return;
   const errors = [];
   for (const file of incoming) {
-    if (!/\.(txt|md)$/i.test(file.name)) { errors.push(`${file.name}: solo se admiten TXT y Markdown.`); continue; }
+    if (!/\.(txt|md|pdf)$/i.test(file.name)) { errors.push(`${file.name}: solo se admiten TXT, Markdown y PDF.`); continue; }
     if (file.size > MAX_SIZE) { errors.push(`${file.name}: supera 1 MiB.`); continue; }
     if (files.length >= 10) { errors.push('El lote ya tiene 10 archivos.'); break; }
     files.push(file);
@@ -76,6 +76,10 @@ function renderReport(value) {
     if (result.status === 'error') {
       card.append(element('p', 'result-error', result.error));
     } else {
+      if (result.source?.format === 'pdf') {
+        card.append(element('p', 'preview', `PDF · ${result.source.pages} ${result.source.pages === 1 ? 'página' : 'páginas'} · Análisis del texto extraído`));
+      }
+      for (const warning of result.warnings || []) card.append(element('p', 'result-warning', warning));
       const stats = element('div', 'stats');
       for (const [key, label] of [['words', 'Palabras'], ['characters', 'Caracteres'], ['lines', 'Líneas'], ['paragraphs', 'Párrafos']]) {
         const stat = element('div', 'stat');

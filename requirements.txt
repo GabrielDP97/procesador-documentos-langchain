@@ -1,2 +1,3 @@
 # Versión validada. Entorno completo: requirements-lock.txt.
 langchain-core==1.6.9
+pypdf==6.21.1

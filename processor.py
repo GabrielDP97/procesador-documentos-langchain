@@ -6,7 +6,9 @@ import os
 import re
 import unicodedata
 from collections import Counter
+from io import BytesIO
 from pathlib import PurePath
+from pypdf import PdfReader
 
 # Este proyecto no envía trazas ni documentos a servicios externos.
 os.environ["LANGSMITH_TRACING"] = "false"
@@ -17,6 +19,9 @@ from langchain_core.runnables import RunnableLambda
 MAX_FILE_BYTES = 1024 * 1024
 MAX_FILES = 10
 MAX_ATTEMPTS = 3
+MAX_PDF_PAGES = 100
+MAX_PDF_STREAM_BYTES = 5 * 1024 * 1024
+MAX_PDF_TEXT_CHARACTERS = 1_000_000
 STOP_WORDS = set("""a al algo ante aquel aquí así aunque bajo cada como con contra cual
 cuando de del desde donde dos el ella ellas ellos en entre era es esa esas ese esos
 esta estaba estas este esto estos fue ha hasta hay la las le les lo los más me mi
@@ -33,6 +38,49 @@ class TransientProcessingError(Exception):
     """Operación temporalmente no disponible."""
 
 
+def extract_pdf(raw):
+    """Extrae texto de todas las páginas, sin ejecutar contenido del PDF."""
+    if not raw.lstrip().startswith(b"%PDF-"):
+        raise ValidationError("El archivo no contiene un PDF válido. No basta con cambiar su extensión.")
+    try:
+        reader = PdfReader(BytesIO(raw))
+        if reader.is_encrypted:
+            raise ValidationError("El PDF está protegido. Guarda una copia sin contraseña para procesarlo.")
+        page_count = len(reader.pages)
+        if not 1 <= page_count <= MAX_PDF_PAGES:
+            raise ValidationError("El PDF debe tener entre 1 y 100 páginas.")
+        texts, empty_pages = [], []
+        text_size = 0
+        stream_size = 0
+        for number, page in enumerate(reader.pages, start=1):
+            contents = page.get_contents()
+            stream_size += len(contents.get_data()) if contents is not None else 0
+            if stream_size > MAX_PDF_STREAM_BYTES:
+                raise ValidationError("El contenido del PDF es demasiado complejo. Divídelo en documentos más pequeños.")
+            text = (page.extract_text() or "").strip()
+            # Algunos PDF incluyen separadores de página como caracteres de control.
+            text = "".join(c for c in text if unicodedata.category(c) != "Cc" or c in "\n\r\t")
+            if text.strip():
+                text_size += len(text)
+                if text_size > MAX_PDF_TEXT_CHARACTERS:
+                    raise ValidationError("El PDF contiene demasiado texto. Divídelo en documentos más pequeños.")
+                texts.append(text)
+            else:
+                empty_pages.append(number)
+        if not texts:
+            raise ValidationError("No se ha encontrado texto extraíble. Si el PDF es un escaneo o contiene solo imágenes, necesita OCR.")
+        warnings = []
+        if empty_pages:
+            pages = ", ".join(str(number) for number in empty_pages)
+            warnings.append(f"Páginas sin texto extraíble: {pages}. Pueden estar en blanco o contener imágenes que necesitan OCR. El análisis incluye solo el texto extraído.")
+        return {"text": "\n\n".join(texts), "source": {"format": "pdf", "pages": page_count,
+                "pages_without_text": empty_pages}, "warnings": warnings}
+    except ValidationError:
+        raise
+    except Exception as exc:
+        raise ValidationError("No se ha podido leer el PDF. Puede estar dañado o usar un formato no compatible; prueba a exportarlo de nuevo.") from exc
+
+
 def validate_upload(upload):
     if not isinstance(upload, dict):
         raise ValidationError("El archivo no tiene un formato válido.")
@@ -41,8 +89,9 @@ def validate_upload(upload):
         raise ValidationError("El nombre del archivo no es válido.")
     if "/" in name or "\\" in name or any(ord(c) < 32 for c in name):
         raise ValidationError("Usa un nombre de archivo sin rutas ni caracteres de control.")
-    if PurePath(name).suffix.lower() not in {".txt", ".md"}:
-        raise ValidationError("Formato no admitido. Usa archivos .txt o .md.")
+    extension = PurePath(name).suffix.lower()
+    if extension not in {".txt", ".md", ".pdf"}:
+        raise ValidationError("Formato no admitido. Usa archivos .txt, .md o .pdf.")
     encoded = upload.get("content")
     if not isinstance(encoded, str) or len(encoded) > 4 * ((MAX_FILE_BYTES + 2) // 3):
         raise ValidationError("El archivo supera el límite de 1 MiB o no contiene texto válido.")
@@ -52,6 +101,8 @@ def validate_upload(upload):
         raise ValidationError("No se ha podido leer el archivo enviado.") from exc
     if len(raw) > MAX_FILE_BYTES:
         raise ValidationError("El archivo supera el límite de 1 MiB.")
+    if extension == ".pdf":
+        return {"name": name, "bytes": len(raw), **extract_pdf(raw)}
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -71,6 +122,8 @@ def analyze_document(document):
     preview = re.sub(r"\s+", " ", paragraphs[0])
     return {
         "name": document["name"], "bytes": document["bytes"],
+        "source": document.get("source", {"format": PurePath(document["name"]).suffix.lower().lstrip(".")}),
+        "warnings": document.get("warnings", []),
         "statistics": {"words": len(words), "characters": len(text),
                        "lines": len(text.splitlines()), "paragraphs": len(paragraphs)},
         "keywords": [{"word": word, "count": count} for word, count in counts.most_common(8)],

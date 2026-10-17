@@ -1,6 +1,6 @@
 # Documento · Procesador local con LangChain Core
 
-Aplicación en español para procesar archivos `.txt` y `.md` en tu ordenador. Funciona con Python y CPU, sin claves de API, modelos, cuentas externas ni servicios de pago.
+Aplicación en español para procesar archivos `.txt`, `.md` y PDF con texto en tu ordenador. Funciona con Python y CPU, sin claves de API, modelos, cuentas externas ni servicios de pago.
 
 ## Empezar en Windows
 
@@ -16,7 +16,8 @@ Abre **http://127.0.0.1:8765**. Con el entorno instalado, también puedes hacer 
 
 ## Qué puedes hacer
 
-- Arrastrar o seleccionar hasta 10 archivos TXT o Markdown, UTF-8, de hasta 1 MiB por archivo.
+- Arrastrar o seleccionar hasta 10 archivos TXT, Markdown o PDF, de hasta 1 MiB por archivo. TXT/Markdown deben estar en UTF-8.
+- Extraer el texto de todas las páginas de un PDF (hasta 100 páginas), con `pypdf`, en memoria y sin conexiones externas. Los resultados muestran las páginas del PDF y avisan si algunas no tienen texto extraíble.
 - Cargar un ejemplo incorporado o los documentos sintéticos de `ejemplos/`.
 - Ver palabras, caracteres, líneas, párrafos y ocho palabras frecuentes, filtrando palabras comunes españolas e inglesas.
 - Leer una vista previa del primer párrafo, de hasta 500 caracteres. **Es un extracto, no un resumen ni una interpretación con IA.** Markdown se trata como texto; no se ejecuta ni renderiza HTML.
@@ -24,11 +25,13 @@ Abre **http://127.0.0.1:8765**. Con el entorno instalado, también puedes hacer 
 - Descargar el lote completo a JSON, incluidos los errores y el número de intentos.
 - Activar «Probar la recuperación ante fallos»: simula un fallo temporal en el primer intento de cada archivo válido. El resultado debe mostrar 2 intentos. Está desactivada inicialmente.
 
-Esta versión admite texto; no incluye PDF, Word, OCR, traducción ni conexión con el recopilador de noticias.
+Los PDF escaneados sin capa de texto necesitan OCR, que esta versión todavía no incorpora. Si solo algunas páginas contienen texto, se analizan esas páginas y se muestra un aviso sobre las restantes. Los PDF cifrados se rechazan con una indicación para guardar una copia sin contraseña. También se detectan PDF dañados o archivos cuya extensión se cambió sin convertirlos.
+
+El orden de lectura y la separación de párrafos dependen del texto extraído del PDF: tablas y columnas pueden perder su disposición visual. Las estadísticas se calculan sobre ese texto, no sobre las imágenes. El límite adicional es 1 millón de caracteres y 5 MiB de contenido de página descomprimido por PDF; si se supera, se pide dividir el documento. No incluye Word, OCR, traducción ni conexión con el recopilador de noticias.
 
 ## Cómo funciona
 
-`processor.py` utiliza una cadena de `RunnableLambda` de LangChain Core: validación → análisis. Solo el análisis lleva `with_retry`; los formatos inválidos, archivos vacíos, binarios, errores de UTF-8 y tamaños excesivos se rechazan antes de ejecutarlo.
+`processor.py` utiliza una cadena de `RunnableLambda` de LangChain Core: validación y lectura/extracción → análisis. Solo el análisis lleva `with_retry`; los formatos inválidos, archivos vacíos, binarios, errores de UTF-8, PDF no compatibles y tamaños excesivos se rechazan antes de ejecutarlo.
 
 Los errores temporales (`TransientProcessingError` y errores de sistema EAGAIN, EBUSY, ETIMEDOUT y EINTR) tienen un máximo de **3 intentos en total**, con esperas cortas. Los errores permanentes no se reintentan. Cada archivo usa una cadena independiente para conservar correctamente los resultados de los lotes mixtos.
 
@@ -46,7 +49,7 @@ No se hacen peticiones externas al procesar. LangSmith viene como dependencia de
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Las pruebas cubren texto en español, métricas, UTF-8/BOM, límites, recuperación y agotamiento de reintentos, errores permanentes, lotes mixtos y servidor HTTP local.
+Las pruebas cubren texto en español, métricas, UTF-8/BOM, límites, recuperación y agotamiento de reintentos, errores permanentes, PDF de varias páginas, PDF escaneados, cifrados y dañados, avisos de extracción parcial, lotes mixtos, exportación y servidor HTTP local. Los PDF de prueba se generan en memoria, sin documentos personales.
 
 Comprobación manual: carga el ejemplo, procésalo, activa la simulación, vuelve a procesarlo y exporta JSON. Prueba también un TXT vacío para ver su error junto a los demás resultados.
 
@@ -54,6 +57,7 @@ Comprobación manual: carga el ejemplo, procésalo, activa la simulación, vuelv
 
 - [LangChain Core](https://github.com/langchain-ai/langchain/tree/master/libs/core).
 - [Runnable.with_retry](https://reference.langchain.com/python/langchain-core/runnables/base/Runnable/with_retry).
+- [Extracción de texto con pypdf](https://pypdf.readthedocs.io/en/stable/user/extract-text.html).
 - [Noticia de origen: langchain-core 1.6.9](https://github.com/langchain-ai/langchain/releases/tag/langchain-core%3D%3D1.6.9).
 
 No subas documentos personales, resultados privados, credenciales ni `.venv` al repositorio.

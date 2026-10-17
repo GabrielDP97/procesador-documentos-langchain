@@ -4,6 +4,7 @@ import json
 import threading
 import unittest
 from app import Handler, LocalServer, MAX_REQUEST_BYTES
+from pdf_fixtures import make_pdf
 
 
 class ServerTests(unittest.TestCase):
@@ -45,6 +46,14 @@ class ServerTests(unittest.TestCase):
     def test_no_filesystem_access(self):
         self.assertEqual(self.request("GET", "/../processor.py")[0], 404)
         self.assertEqual(self.request("GET", "/processor.py")[0], 404)
+
+    def test_pdf_api(self):
+        payload = {"files": [{"name": "prueba.pdf", "content": base64.b64encode(make_pdf()).decode()}]}
+        status, body, _ = self.request("POST", "/api/process", json.dumps(payload), {"Content-Type": "application/json", "Origin": self.origin})
+        result = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["summary"]["ok"], 1)
+        self.assertEqual(result["results"][0]["source"]["format"], "pdf")
 
     def test_external_origins_and_hosts_blocked(self):
         self.assertEqual(self.request("GET", "/", headers={"Host": "evil.example"})[0], 403)
