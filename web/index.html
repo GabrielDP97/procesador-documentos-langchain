@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Procesa tus documentos de texto en tu ordenador y exporta los resultados.">
+  <title>Documento · Procesador local</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/" aria-label="Documento, inicio"><span class="brand-icon">D</span> documento<span class="brand-dot">.</span></a><span class="local"><i></i> Todo en tu ordenador</span></header>
+  <main>
+    <div class="intro"><p class="eyebrow">TU MESA DE TRABAJO · LANGCHAIN CORE</p><h1>Del texto a lo esencial.</h1><p>Explora tus documentos, encuentra las palabras que más aparecen<br class="desktop"> y llévate un resultado ordenado. Sin salir de tu ordenador.</p></div>
+    <div class="workspace">
+      <section class="panel upload-panel" aria-labelledby="upload-title">
+        <div class="section-heading"><span class="step">01</span><h2 id="upload-title">Añade tus documentos</h2></div>
+        <label class="drop-zone" id="drop-zone" for="file-input"><span class="upload-icon" aria-hidden="true">↥</span><strong>Arrastra tus archivos aquí</strong><span>o haz clic para seleccionarlos</span><small>TXT y Markdown · UTF-8 · Hasta 1 MiB por archivo</small></label>
+        <input id="file-input" type="file" accept=".txt,.md,text/plain,text/markdown" multiple>
+        <div class="file-heading"><span id="file-count">Ningún archivo seleccionado</span><button id="clear" class="text-button" disabled>Vaciar</button></div>
+        <ul id="file-list" class="file-list" aria-label="Archivos seleccionados"></ul>
+        <button id="example" class="example-button">+ Cargar un ejemplo</button>
+        <div class="options"><label><input id="simulate" type="checkbox"><span>Probar la recuperación ante fallos<small>Simula un fallo temporal por documento válido. La aplicación volverá a intentarlo automáticamente.</small></span></label></div>
+        <button id="process" class="primary-button" disabled>Procesar documentos <span aria-hidden="true">→</span></button>
+        <p class="limit">Máximo 10 archivos por lote. Hasta 3 intentos por documento.</p>
+        <p id="message" role="status" aria-live="polite"></p>
+      </section>
+      <section class="panel results-panel" aria-labelledby="results-title" aria-busy="false">
+        <div class="results-heading"><div class="section-heading"><span class="step">02</span><h2 id="results-title">Tus resultados</h2></div><button id="export" class="secondary-button" disabled>↓ Exportar JSON</button></div>
+        <div id="empty" class="empty-state"><div class="document-art" aria-hidden="true"><span></span><span></span><span></span><span></span></div><h3>Todo empieza con un documento</h3><p>Añade un archivo y pulsa «Procesar documentos».<br>Aquí aparecerá el resultado de cada uno.</p><div class="empty-tags"><span>Estadísticas</span><span>Palabras frecuentes</span><span>Vista previa</span></div></div>
+        <div id="summary" class="batch-summary" hidden></div>
+        <div id="results" aria-live="polite"></div>
+      </section>
+    </div>
+    <aside class="privacy"><span aria-hidden="true">◈</span><p><strong>Tus archivos se quedan contigo.</strong> Se procesan en memoria y no se guardan en el servidor. Puedes descargar los resultados cuando quieras.</p></aside>
+    <footer><span>Lectura y análisis local con LangChain Core.</span><span>La vista previa es un extracto del texto, no un resumen generado por IA.</span></footer>
+  </main>
+</body>
+</html>

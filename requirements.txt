@@ -1,2 +1,2 @@
-# Rango inicial. Fijar la versión tras comprobar la API al comenzar el desarrollo.
-langchain-core>=1.0,<2.0
+# Versión validada. Entorno completo: requirements-lock.txt.
+langchain-core==1.6.9
