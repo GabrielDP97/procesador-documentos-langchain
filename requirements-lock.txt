@@ -17,9 +17,11 @@ langchain-protocol==0.0.19
 langsmith==0.14.11
 orjson==3.13.0
 packaging==26.3
+pillow==12.3.0
 pydantic==2.14.1
 pydantic_core==2.50.1
 pypdf==6.21.1
+pypdfium2==5.14.0
 PyYAML==6.0.3
 requests==2.34.2
 requests-toolbelt==1.0.0

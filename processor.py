@@ -9,6 +9,7 @@ from collections import Counter
 from io import BytesIO
 from pathlib import PurePath
 from pypdf import PdfReader
+from ocr import OcrError, recognize_pdf_pages
 
 # Este proyecto no envía trazas ni documentos a servicios externos.
 os.environ["LANGSMITH_TRACING"] = "false"
@@ -49,7 +50,7 @@ def extract_pdf(raw):
         page_count = len(reader.pages)
         if not 1 <= page_count <= MAX_PDF_PAGES:
             raise ValidationError("El PDF debe tener entre 1 y 100 páginas.")
-        texts, empty_pages = [], []
+        texts, empty_pages = {}, []
         text_size = 0
         stream_size = 0
         for number, page in enumerate(reader.pages, start=1):
@@ -64,17 +65,46 @@ def extract_pdf(raw):
                 text_size += len(text)
                 if text_size > MAX_PDF_TEXT_CHARACTERS:
                     raise ValidationError("El PDF contiene demasiado texto. Divídelo en documentos más pequeños.")
-                texts.append(text)
+                texts[number] = text
             else:
                 empty_pages.append(number)
-        if not texts:
-            raise ValidationError("No se ha encontrado texto extraíble. Si el PDF es un escaneo o contiene solo imágenes, necesita OCR.")
         warnings = []
+        ocr_pages, attempted_pages = [], []
+        ocr_issue = None
+        if empty_pages:
+            try:
+                recognized, issues = recognize_pdf_pages(raw, empty_pages)
+                attempted_pages = list(empty_pages)
+                for number in empty_pages:
+                    text = recognized.get(number, "").strip()
+                    text = "".join(c for c in text if unicodedata.category(c) != "Cc" or c in "\n\r\t")
+                    if text.strip():
+                        text_size += len(text)
+                        if text_size > MAX_PDF_TEXT_CHARACTERS:
+                            raise ValidationError("El PDF contiene demasiado texto. Divídelo en documentos más pequeños.")
+                        texts[number] = text
+                        ocr_pages.append(number)
+                    if number in issues:
+                        warnings.append(f"OCR, página {number}: {issues[number]}")
+                if issues:
+                    ocr_issue = next(iter(issues.values()))
+            except OcrError as exc:
+                ocr_issue = str(exc)
+                warnings.append(f"OCR no disponible para este documento: {ocr_issue}")
+        if not texts:
+            if ocr_issue:
+                raise ValidationError(f"No se pudo obtener texto mediante OCR: {ocr_issue}")
+            raise ValidationError("El OCR no ha reconocido texto. Comprueba que el escaneo sea legible y esté orientado correctamente; la página también puede estar en blanco.")
+        if ocr_pages:
+            warnings.insert(0, "OCR aplicado en las páginas " + ", ".join(map(str, ocr_pages)) + ". Revisa el texto reconocido: puede contener errores.")
+        empty_pages = [number for number in empty_pages if number not in texts]
         if empty_pages:
             pages = ", ".join(str(number) for number in empty_pages)
-            warnings.append(f"Páginas sin texto extraíble: {pages}. Pueden estar en blanco o contener imágenes que necesitan OCR. El análisis incluye solo el texto extraído.")
-        return {"text": "\n\n".join(texts), "source": {"format": "pdf", "pages": page_count,
-                "pages_without_text": empty_pages}, "warnings": warnings}
+            warnings.append(f"Páginas sin texto reconocido: {pages}. Pueden estar en blanco o tener imágenes ilegibles. El análisis incluye solo las páginas con texto; revisa el resultado del OCR.")
+        return {"text": "\n\n".join(texts[number] for number in sorted(texts)),
+                "source": {"format": "pdf", "pages": page_count, "pages_without_text": empty_pages,
+                           "ocr_pages": ocr_pages, "ocr_attempted_pages": attempted_pages,
+                           "ocr_languages": ["spa", "eng"] if attempted_pages else []}, "warnings": warnings}
     except ValidationError:
         raise
     except Exception as exc:

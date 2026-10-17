@@ -2,6 +2,7 @@
 from io import BytesIO
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject, NumberObject
+from PIL import Image, ImageDraw, ImageFont
 
 
 def make_pdf(pages=("Texto de prueba en español.",), *, password=None):
@@ -33,4 +34,17 @@ def make_pdf(pages=("Texto de prueba en español.",), *, password=None):
         writer.encrypt(password)
     stream = BytesIO()
     writer.write(stream)
+    return stream.getvalue()
+
+
+def make_scanned_pdf():
+    """Texto rasterizado: el PDF no tiene ninguna capa de texto."""
+    image = Image.new("RGB", (1600, 650), "white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default(size=48)
+    draw.multiline_text((80, 90), "Documento escaneado de prueba\n\nIdeas para proyectos locales.\nAnálisis de texto en español.\nEl OCR reconoce estas palabras.",
+                        fill="black", font=font, spacing=20)
+    stream = BytesIO()
+    image.save(stream, format="PDF", resolution=150)
+    image.close()
     return stream.getvalue()

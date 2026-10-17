@@ -8,6 +8,12 @@ from processor import process_batch, process_upload
 
 
 class PdfTests(unittest.TestCase):
+    def setUp(self):
+        # Estos casos prueban extracción PDF; los de OCR tienen su propia suite.
+        patcher = patch("processor.recognize_pdf_pages", return_value=({}, {}))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_extracts_all_pages_and_spanish_characters(self):
         raw = make_pdf(["Ideas útiles en español.", "Más ideas para mañana."])
         result = process_upload(upload(raw, "informe.PDF"))
@@ -16,7 +22,10 @@ class PdfTests(unittest.TestCase):
         self.assertEqual(result["statistics"]["words"], 8)
         self.assertIn("español", result["preview"])
         self.assertIn({"word": "mañana", "count": 1}, result["keywords"])
-        self.assertEqual(result["source"], {"format": "pdf", "pages": 2, "pages_without_text": []})
+        self.assertEqual(result["source"]["format"], "pdf")
+        self.assertEqual(result["source"]["pages"], 2)
+        self.assertEqual(result["source"]["pages_without_text"], [])
+        self.assertEqual(result["source"]["ocr_pages"], [])
         self.assertEqual(result["bytes"], len(raw))
         self.assertEqual(result["warnings"], [])
 

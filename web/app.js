@@ -78,6 +78,7 @@ function renderReport(value) {
     } else {
       if (result.source?.format === 'pdf') {
         card.append(element('p', 'preview', `PDF · ${result.source.pages} ${result.source.pages === 1 ? 'página' : 'páginas'} · Análisis del texto extraído`));
+        if (result.source.ocr_pages?.length) card.append(element('p', 'preview', `OCR local · ${result.source.ocr_pages.length} ${result.source.ocr_pages.length === 1 ? 'página reconocida' : 'páginas reconocidas'} · Español e inglés`));
       }
       for (const warning of result.warnings || []) card.append(element('p', 'result-warning', warning));
       const stats = element('div', 'stats');
@@ -108,7 +109,7 @@ $('process').onclick = async () => {
   ['example', 'simulate', 'file-input', 'export'].forEach(id => $(id).disabled = true);
   renderFiles();
   $('process').textContent = 'Procesando…';
-  message('Leyendo y procesando los documentos en local…');
+  message('Leyendo y procesando en local… El OCR de documentos escaneados puede tardar unos minutos.');
   try {
     const uploads = await Promise.all(files.map(fileBase64));
     const response = await fetch('/api/process', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({files: uploads, simulate_transient: $('simulate').checked})});
