@@ -1,16 +1,26 @@
 # Documento · Procesador local con LangChain Core
 
+[![Comprobar aplicación](https://github.com/GabrielDP97/procesador-documentos-langchain/actions/workflows/verify.yml/badge.svg)](https://github.com/GabrielDP97/procesador-documentos-langchain/actions/workflows/verify.yml)
+
 Aplicación en español para procesar archivos `.txt`, `.md` y PDF, incluidos escaneados, en tu ordenador. Funciona con Python y CPU, sin claves de API, cuentas externas ni servicios de pago.
 
 **Versión 1.1.1 — aplicación local funcional.** LangChain Core compone el procesamiento y aplica reintentos; `pypdf` extrae texto y Tesseract reconoce páginas escaneadas. El resultado es un análisis determinista, sin un modelo de lenguaje externo.
 
 ![Interfaz con un PDF escaneado reconocido mediante OCR](docs/aplicacion.png)
 
+## Qué aporta LangChain
+
+Este proyecto practica la composición de cadenas y la recuperación ante fallos con **LangChain Core**. `RunnableLambda` conecta la validación y extracción del texto con su análisis; `with_retry` reintenta únicamente los fallos temporales del análisis. La extracción y el OCR no se repiten por un fallo posterior.
+
+`pypdf` lee el PDF, PDFium convierte sus páginas en imágenes y Tesseract reconoce el texto. Las estadísticas y palabras frecuentes se calculan con Python. LangChain organiza el flujo; no aporta un modelo generativo, traducción ni comprensión semántica. El mismo flujo podría implementarse con Python sin LangChain: aquí se utiliza como ejercicio de sus cadenas y reintentos.
+
 ## Empezar en Windows
 
 Requiere Python 3.10 o posterior. Desde esta carpeta en PowerShell:
 
 ```powershell
+git clone https://github.com/GabrielDP97/procesador-documentos-langchain.git
+cd procesador-documentos-langchain
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements-lock.txt
 .venv\Scripts\python.exe app.py
@@ -18,7 +28,21 @@ python -m venv .venv
 
 Abre **http://127.0.0.1:8765**. Con el entorno instalado, también puedes hacer doble clic en `iniciar.cmd`. Mantén la terminal abierta mientras usas la aplicación; Ctrl+C detiene el servidor. Si el puerto está ocupado, usa `app.py --port 8766`.
 
-En Linux, el equivalente al ejecutable del entorno es `.venv/bin/python`. Instala también Tesseract con los idiomas español e inglés según la sección de OCR.
+Para clonar este repositorio privado debes usar una cuenta con acceso.
+
+### Linux (Ubuntu/Debian)
+
+```bash
+git clone https://github.com/GabrielDP97/procesador-documentos-langchain.git
+cd procesador-documentos-langchain
+sudo apt-get update
+sudo apt-get install -y python3-venv tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng tesseract-ocr-deu
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-lock.txt
+.venv/bin/python app.py
+```
+
+En Windows instala Tesseract según la sección de OCR. Los TXT/Markdown y PDF con texto digital funcionan sin Tesseract.
 
 ## Demostración en cinco minutos
 
@@ -32,7 +56,7 @@ Los archivos de `ejemplos/` son sintéticos. Para una demostración de OCR utili
 
 ## Qué puedes hacer
 
-- Arrastrar o seleccionar hasta 10 archivos TXT, Markdown o PDF, PDF de hasta 150 MiB y TXT/Markdown de hasta 1 MiB por archivo. TXT/Markdown deben estar en UTF-8.
+- Arrastrar o seleccionar hasta 10 archivos: PDF de hasta 150 MiB y TXT/Markdown de hasta 1 MiB por archivo. TXT/Markdown deben estar en UTF-8.
 - Extraer el texto de todas las páginas de un PDF (hasta 1000 páginas), con `pypdf`, desde una copia temporal local y sin conexiones externas. En páginas sin texto, aplicar OCR local automáticamente con PDFium y Tesseract en español e inglés, alemán e inglés o inglés, según el selector. Se indica qué páginas se han reconocido y cuáles siguen sin texto.
 - Cargar un ejemplo incorporado o los documentos sintéticos de `ejemplos/`.
 - Ver palabras, caracteres, líneas, párrafos y ocho palabras frecuentes, filtrando palabras comunes españolas, inglesas y alemanas.
@@ -47,6 +71,21 @@ El orden de lectura y la separación de párrafos dependen del texto extraído d
 
 Los archivos se procesan en segundo plano y la interfaz muestra subida y páginas procesadas. Puedes cancelar el lote. Mantén abierto el servidor hasta ver los resultados. Si recargas la misma pestaña, recupera el progreso y resultado del documento activo; los archivos aún no subidos y los resultados de documentos anteriores del lote no se recuperan. Los libros escaneados de cientos de páginas pueden tardar varios minutos. La cancelación espera a que termine la página OCR actual (hasta 60 segundos).
 
+## Límites de procesamiento
+
+| Recurso | Límite |
+| --- | --- |
+| Archivos por lote | 10, subidos secuencialmente |
+| PDF | 150 MiB y 1000 páginas |
+| TXT / Markdown | 1 MiB por archivo, UTF-8 |
+| OCR | Hasta 1000 páginas sin texto; 60 s por página; presupuesto de 7200 s por documento |
+| Cola local | Hasta 2 trabajos activos y 1 procesador simultáneo |
+| Texto extraído | 5 millones de caracteres por PDF |
+| Contenido de página descomprimido | 100 MiB acumulados por PDF |
+| Reintentos de análisis | 3 intentos en total |
+
+Un PDF puede cumplir el tamaño máximo y alcanzar otro límite. Los avisos identifican las páginas que no se han reconocido; el resultado puede ser parcial.
+
 ## OCR local
 
 Además de instalar `requirements-lock.txt`, necesitas **Tesseract** con los idiomas `spa` y `eng` (y `deu` para alemán). En el ordenador de desarrollo ya está instalado y comprobado. Para otro equipo, consulta la [instalación de Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) e incluye español e inglés. Comprueba la instalación con:
@@ -57,9 +96,25 @@ tesseract --list-langs
 
 La aplicación busca `tesseract` en PATH y en `C:/Program Files/Tesseract-OCR/`. Para una ubicación distinta puedes definir `TESSERACT_CMD` antes de arrancarla. Si faltan el programa o los idiomas, verás instrucciones en el resultado; los PDF con texto digital siguen funcionando.
 
-El OCR admite hasta **1000 páginas sin texto por PDF**, 60 segundos por página y un presupuesto de 7200 segundos por documento (además del tiempo de renderizado). Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
+El OCR admite hasta **1000 páginas sin texto por PDF**, 60 segundos por página y un presupuesto de 7200 segundos por documento, incluido el renderizado. Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
 
 ## Cómo funciona
+
+```mermaid
+flowchart TD
+    A[Navegador: selecciona archivo e idioma] --> B[Servidor local: subida binaria]
+    B --> C[Cola y copia temporal local]
+    C --> D[Validación y extracción con pypdf]
+    D --> E{¿Hay páginas sin texto?}
+    E -->|Sí| F[PDFium y Tesseract: OCR local]
+    E -->|No| G[Análisis con Python]
+    F --> G
+    G --> H[Resultado y avisos en el navegador]
+    H --> I[Exportación JSON opcional]
+    C -. Al finalizar, fallar o cancelar .-> J[Eliminar copia temporal]
+```
+
+La cadena de LangChain envuelve la validación/extracción y el análisis. La cola, la subida, el progreso y la cancelación se gestionan en `app.py` y `jobs.py`.
 
 `processor.py` utiliza una cadena de `RunnableLambda` de LangChain Core: validación y lectura/extracción → análisis. Solo el análisis lleva `with_retry`; los formatos inválidos, archivos vacíos, binarios, errores de UTF-8, PDF no compatibles y tamaños excesivos se rechazan antes de ejecutarlo.
 
@@ -79,9 +134,18 @@ No se hacen peticiones externas al procesar. LangSmith viene como dependencia de
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
+La suite contiene **34 pruebas**. Comprueba también la sintaxis del cliente y las dependencias:
+
+```powershell
+node --check web/app.js
+.venv\Scripts\python.exe -m pip check
+```
+
+Node.js solo se utiliza para esta comprobación de sintaxis; no es necesario para ejecutar la aplicación.
+
 Las pruebas cubren texto en español, métricas, UTF-8/BOM, límites, recuperación y agotamiento de reintentos, errores permanentes, PDF de varias páginas, escaneados, cifrados y dañados, OCR de páginas mixtas en orden, OCR ausente y tiempos límite, avisos de extracción parcial, lotes mixtos, exportación y servidor HTTP local. Los PDF de prueba se generan en memoria, sin documentos personales. La prueba real de OCR se omite si no está instalado Tesseract con español e inglés.
 
-GitHub ejecuta las mismas comprobaciones al actualizar `main` o abrir una pull request. El workflow instala Tesseract y verifica explícitamente que español e inglés estén disponibles antes de ejecutar las pruebas, para que la integración real de OCR no quede omitida por falta de instalación.
+GitHub ejecuta las mismas comprobaciones al actualizar `main` o abrir una pull request. El workflow instala Tesseract y verifica explícitamente que español, inglés y alemán estén disponibles antes de ejecutar las pruebas, para que la integración real de OCR no quede omitida por falta de instalación.
 
 ## Estructura y decisiones
 
@@ -92,9 +156,21 @@ GitHub ejecuta las mismas comprobaciones al actualizar `main` o abrir una pull r
 - `web/`: interfaz sin servicios externos, con resultados aislados por documento y descarga JSON.
 - `tests/`: datos sintéticos y pruebas del dominio, del servidor y de integración con OCR.
 
-Consulta los cambios entregados en `CHANGELOG.md`. Mejoras futuras como Word, resúmenes con IA, un PDF de salida con capa OCR o uso multiusuario quedan fuera de esta primera versión.
+Consulta los cambios entregados en [CHANGELOG.md](CHANGELOG.md) y la guía para colaborar en [CONTRIBUTING.md](CONTRIBUTING.md). Mejoras futuras como Word, resúmenes con IA, un PDF de salida con capa OCR o uso multiusuario quedan fuera de esta primera versión.
 
 Comprobación manual: carga el ejemplo, procésalo, activa la simulación, vuelve a procesarlo y exporta JSON. Prueba también un TXT vacío para ver su error junto a los demás resultados.
+
+## Solución de problemas
+
+| Problema | Qué comprobar |
+| --- | --- |
+| No abre la web local | Mantén abierta la terminal y usa la URL impresa al arrancar. |
+| Puerto ocupado | Arranca con `app.py --port 8766` y usa esa dirección. |
+| OCR no disponible | Instala Tesseract y los idiomas seleccionados; reinicia el servidor. |
+| El libro está en alemán | Selecciona **Alemán e inglés** antes de procesarlo. No traduce el contenido. |
+| Algunas páginas no tienen texto | Revisa los avisos: pueden estar en blanco, ser ilegibles o superar el tiempo de OCR. |
+| Has recargado la pestaña | Recupera el documento activo mientras el servidor siga abierto; vuelve a seleccionar los archivos pendientes. |
+| El proceso se cerró durante una subida | Revisa las copias `documento-*` en la carpeta temporal del sistema, según la sección de privacidad. |
 
 ## Referencias
 
