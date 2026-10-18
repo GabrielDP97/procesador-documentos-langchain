@@ -123,4 +123,4 @@ class Jobs:
                 job["cancel"].set()
             threads = list(self.threads)
         for thread in threads:
-            thread.join(timeout=25)
+            thread.join(timeout=65)

@@ -2,7 +2,7 @@
 
 Aplicación en español para procesar archivos `.txt`, `.md` y PDF, incluidos escaneados, en tu ordenador. Funciona con Python y CPU, sin claves de API, cuentas externas ni servicios de pago.
 
-**Versión 1.1.0 — aplicación local funcional.** LangChain Core compone el procesamiento y aplica reintentos; `pypdf` extrae texto y Tesseract reconoce páginas escaneadas. El resultado es un análisis determinista, sin un modelo de lenguaje externo.
+**Versión 1.1.1 — aplicación local funcional.** LangChain Core compone el procesamiento y aplica reintentos; `pypdf` extrae texto y Tesseract reconoce páginas escaneadas. El resultado es un análisis determinista, sin un modelo de lenguaje externo.
 
 ![Interfaz con un PDF escaneado reconocido mediante OCR](docs/aplicacion.png)
 
@@ -45,7 +45,7 @@ Los PDF escaneados sin capa de texto pasan por OCR automáticamente. Los PDF mix
 
 El orden de lectura y la separación de párrafos dependen del texto extraído del PDF: tablas y columnas pueden perder su disposición visual. Las estadísticas se calculan sobre ese texto y el reconocido con OCR. El límite adicional es 5 millones de caracteres y 100 MiB de contenido de página descomprimido por PDF; si se supera, se pide dividir el documento. No incluye Word, traducción ni conexión con el recopilador de noticias.
 
-Los archivos se procesan en segundo plano y la interfaz muestra subida y páginas procesadas. Puedes cancelar el lote. Mantén abierto el servidor hasta ver los resultados. Si recargas la misma pestaña, recupera el progreso y resultado del documento activo; los archivos aún no subidos y los resultados de documentos anteriores del lote no se recuperan. Los libros escaneados de cientos de páginas pueden tardar varios minutos. La cancelación espera a que termine la página OCR actual (hasta 20 segundos).
+Los archivos se procesan en segundo plano y la interfaz muestra subida y páginas procesadas. Puedes cancelar el lote. Mantén abierto el servidor hasta ver los resultados. Si recargas la misma pestaña, recupera el progreso y resultado del documento activo; los archivos aún no subidos y los resultados de documentos anteriores del lote no se recuperan. Los libros escaneados de cientos de páginas pueden tardar varios minutos. La cancelación espera a que termine la página OCR actual (hasta 60 segundos).
 
 ## OCR local
 
@@ -57,7 +57,7 @@ tesseract --list-langs
 
 La aplicación busca `tesseract` en PATH y en `C:/Program Files/Tesseract-OCR/`. Para una ubicación distinta puedes definir `TESSERACT_CMD` antes de arrancarla. Si faltan el programa o los idiomas, verás instrucciones en el resultado; los PDF con texto digital siguen funcionando.
 
-El OCR admite hasta **1000 páginas sin texto por PDF**, 20 segundos por página y un presupuesto de 7200 segundos por documento (además del tiempo de renderizado). Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
+El OCR admite hasta **1000 páginas sin texto por PDF**, 60 segundos por página y un presupuesto de 7200 segundos por documento (además del tiempo de renderizado). Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
 
 ## Cómo funciona
 

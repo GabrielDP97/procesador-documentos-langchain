@@ -1,3 +1,7 @@
+# Cambios 1.1.1 · 2026-10-18
+
+- Ampliado a 60 segundos el OCR por página para libros con páginas densas.
+
 # Cambios 1.1.0 · 2026-10-18
 
 - PDF de hasta 150 MiB y 1000 páginas; TXT/Markdown conservan el máximo de 1 MiB.

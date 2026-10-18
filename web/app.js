@@ -89,7 +89,7 @@ $('cancel').onclick = async () => {
   cancelled = true;
   $('cancel').disabled = true;
   if (currentUpload) currentUpload.abort();
-  message('Cancelando… La página de OCR actual puede tardar hasta 20 segundos en terminar.');
+  message('Cancelando… La página de OCR actual puede tardar hasta 60 segundos en terminar.');
   if (currentJob) {
     try { await fetch(`/api/jobs/${currentJob}/cancel`, {method: 'POST'}); }
     catch { message('No se pudo confirmar la cancelación. Comprueba que el servidor sigue abierto.', true); }

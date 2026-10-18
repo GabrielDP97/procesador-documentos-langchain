@@ -13,7 +13,7 @@ import pypdfium2 as pdfium
 
 MAX_OCR_PAGES = 1000
 MAX_RENDER_PIXELS = 8_000_000
-OCR_PAGE_TIMEOUT = 20
+OCR_PAGE_TIMEOUT = 60
 OCR_DOCUMENT_TIMEOUT = 7200
 # PDFium no admite llamadas simultáneas, ni siquiera para documentos distintos.
 PDFIUM_LOCK = threading.Lock()
