@@ -13,15 +13,17 @@
     <div class="workspace">
       <section class="panel upload-panel" aria-labelledby="upload-title">
         <div class="section-heading"><span class="step">01</span><h2 id="upload-title">Añade tus documentos</h2></div>
-        <label class="drop-zone" id="drop-zone" for="file-input"><span class="upload-icon" aria-hidden="true">↥</span><strong>Arrastra tus archivos aquí</strong><span>o haz clic para seleccionarlos</span><small>TXT, Markdown y PDF · Hasta 1 MiB por archivo</small></label>
+        <label class="drop-zone" id="drop-zone" for="file-input"><span class="upload-icon" aria-hidden="true">↥</span><strong>Arrastra tus archivos aquí</strong><span>o haz clic para seleccionarlos</span><small>PDF hasta 150 MiB · TXT y Markdown hasta 1 MiB</small></label>
         <input id="file-input" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf" multiple>
         <div class="file-heading"><span id="file-count">Ningún archivo seleccionado</span><button id="clear" class="text-button" disabled>Vaciar</button></div>
         <ul id="file-list" class="file-list" aria-label="Archivos seleccionados"></ul>
         <button id="example" class="example-button">+ Cargar un ejemplo</button>
         <div class="options"><label><input id="simulate" type="checkbox"><span>Probar la recuperación ante fallos<small>Simula un fallo temporal por documento válido. La aplicación volverá a intentarlo automáticamente.</small></span></label></div>
+        <label class="limit" for="languages">Idioma del OCR</label><select id="languages"><option value="spa+eng">Español e inglés</option><option value="deu+eng">Alemán e inglés</option><option value="eng">Inglés</option></select>
+        <div id="job-progress" hidden><p id="progress-status" role="status"></p><progress id="progress-bar" max="100" value="0"></progress><button id="cancel" class="secondary-button">Cancelar lote</button></div>
         <button id="process" class="primary-button" disabled>Procesar documentos <span aria-hidden="true">→</span></button>
         <p class="limit">Máximo 10 archivos por lote. Hasta 3 intentos por documento.</p>
-        <p class="limit">TXT/MD en UTF-8. PDF de hasta 100 páginas · OCR automático en español e inglés (máximo 20 páginas sin texto).</p>
+        <p class="limit">TXT/MD en UTF-8. PDF de hasta 1000 páginas · OCR local de hasta 1000 páginas, con un máximo de 2 horas por documento.</p>
         <p id="message" role="status" aria-live="polite"></p>
       </section>
       <section class="panel results-panel" aria-labelledby="results-title" aria-busy="false">
@@ -31,7 +33,7 @@
         <div id="results" aria-live="polite"></div>
       </section>
     </div>
-    <aside class="privacy"><span aria-hidden="true">◈</span><p><strong>Tus archivos se quedan contigo.</strong> Se procesan en memoria y no se guardan en el servidor. Puedes descargar los resultados cuando quieras.</p></aside>
+    <aside class="privacy"><span aria-hidden="true">◈</span><p><strong>Tus archivos se quedan contigo.</strong> Se crea una copia temporal en tu ordenador que se elimina al terminar o cancelar el trabajo. Mantén la aplicación abierta durante el procesamiento. Puedes descargar los resultados cuando quieras.</p></aside>
     <footer><span>Lectura y análisis local con LangChain Core.</span><span>La vista previa es un extracto del texto, no un resumen generado por IA.</span></footer>
   </main>
 </body>

@@ -1,3 +1,10 @@
+# Cambios 1.1.0 · 2026-10-18
+
+- PDF de hasta 150 MiB y 1000 páginas; TXT/Markdown conservan el máximo de 1 MiB.
+- Subida binaria sin base64, cola local acotada, progreso por páginas y cancelación.
+- OCR alemán/inglés, español/inglés o inglés; hasta 1000 páginas y 2 horas de OCR por PDF.
+- Copias temporales locales eliminadas al terminar, fallar o cancelar. Sin envío de documentos a servicios externos.
+
 # Historial de versiones
 
 ## 1.0.0 · 18 de octubre de 2026

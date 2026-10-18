@@ -2,7 +2,7 @@
 
 Aplicación en español para procesar archivos `.txt`, `.md` y PDF, incluidos escaneados, en tu ordenador. Funciona con Python y CPU, sin claves de API, cuentas externas ni servicios de pago.
 
-**Versión 1.0.0 — aplicación local funcional.** LangChain Core compone el procesamiento y aplica reintentos; `pypdf` extrae texto y Tesseract reconoce páginas escaneadas. El resultado es un análisis determinista, sin un modelo de lenguaje externo.
+**Versión 1.1.0 — aplicación local funcional.** LangChain Core compone el procesamiento y aplica reintentos; `pypdf` extrae texto y Tesseract reconoce páginas escaneadas. El resultado es un análisis determinista, sin un modelo de lenguaje externo.
 
 ![Interfaz con un PDF escaneado reconocido mediante OCR](docs/aplicacion.png)
 
@@ -32,10 +32,10 @@ Los archivos de `ejemplos/` son sintéticos. Para una demostración de OCR utili
 
 ## Qué puedes hacer
 
-- Arrastrar o seleccionar hasta 10 archivos TXT, Markdown o PDF, de hasta 1 MiB por archivo. TXT/Markdown deben estar en UTF-8.
-- Extraer el texto de todas las páginas de un PDF (hasta 100 páginas), con `pypdf`, en memoria y sin conexiones externas. En páginas sin texto, aplicar OCR local automáticamente con PDFium y Tesseract en español e inglés. Se indica qué páginas se han reconocido y cuáles siguen sin texto.
+- Arrastrar o seleccionar hasta 10 archivos TXT, Markdown o PDF, PDF de hasta 150 MiB y TXT/Markdown de hasta 1 MiB por archivo. TXT/Markdown deben estar en UTF-8.
+- Extraer el texto de todas las páginas de un PDF (hasta 1000 páginas), con `pypdf`, desde una copia temporal local y sin conexiones externas. En páginas sin texto, aplicar OCR local automáticamente con PDFium y Tesseract en español e inglés, alemán e inglés o inglés, según el selector. Se indica qué páginas se han reconocido y cuáles siguen sin texto.
 - Cargar un ejemplo incorporado o los documentos sintéticos de `ejemplos/`.
-- Ver palabras, caracteres, líneas, párrafos y ocho palabras frecuentes, filtrando palabras comunes españolas e inglesas.
+- Ver palabras, caracteres, líneas, párrafos y ocho palabras frecuentes, filtrando palabras comunes españolas, inglesas y alemanas.
 - Leer una vista previa del primer párrafo, de hasta 500 caracteres. **Es un extracto, no un resumen ni una interpretación con IA.** Markdown se trata como texto; no se ejecuta ni renderiza HTML.
 - Revisar errores por archivo sin perder los resultados de los otros documentos.
 - Descargar el lote completo a JSON, incluidos los errores y el número de intentos.
@@ -43,11 +43,13 @@ Los archivos de `ejemplos/` son sintéticos. Para una demostración de OCR utili
 
 Los PDF escaneados sin capa de texto pasan por OCR automáticamente. Los PDF mixtos conservan el texto digital y aplican OCR solo a las páginas sin texto, respetando su orden. El reconocimiento puede cometer errores: revisa nombres, cifras y texto poco legible. No se vuelve a reconocer una página que ya tenga texto extraíble. Los PDF cifrados se rechazan con una indicación para guardar una copia sin contraseña. También se detectan PDF dañados o archivos cuya extensión se cambió sin convertirlos.
 
-El orden de lectura y la separación de párrafos dependen del texto extraído del PDF: tablas y columnas pueden perder su disposición visual. Las estadísticas se calculan sobre ese texto y el reconocido con OCR. El límite adicional es 1 millón de caracteres y 5 MiB de contenido de página descomprimido por PDF; si se supera, se pide dividir el documento. No incluye Word, traducción ni conexión con el recopilador de noticias.
+El orden de lectura y la separación de párrafos dependen del texto extraído del PDF: tablas y columnas pueden perder su disposición visual. Las estadísticas se calculan sobre ese texto y el reconocido con OCR. El límite adicional es 5 millones de caracteres y 100 MiB de contenido de página descomprimido por PDF; si se supera, se pide dividir el documento. No incluye Word, traducción ni conexión con el recopilador de noticias.
+
+Los archivos se procesan en segundo plano y la interfaz muestra subida y páginas procesadas. Puedes cancelar el lote. Mantén abierto el servidor hasta ver los resultados. Si recargas la misma pestaña, recupera el progreso y resultado del documento activo; los archivos aún no subidos y los resultados de documentos anteriores del lote no se recuperan. Los libros escaneados de cientos de páginas pueden tardar varios minutos. La cancelación espera a que termine la página OCR actual (hasta 20 segundos).
 
 ## OCR local
 
-Además de instalar `requirements-lock.txt`, necesitas **Tesseract** con los idiomas `spa` y `eng`. En el ordenador de desarrollo ya está instalado y comprobado. Para otro equipo, consulta la [instalación de Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) e incluye español e inglés. Comprueba la instalación con:
+Además de instalar `requirements-lock.txt`, necesitas **Tesseract** con los idiomas `spa` y `eng` (y `deu` para alemán). En el ordenador de desarrollo ya está instalado y comprobado. Para otro equipo, consulta la [instalación de Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) e incluye español e inglés. Comprueba la instalación con:
 
 ```powershell
 tesseract --list-langs
@@ -55,7 +57,7 @@ tesseract --list-langs
 
 La aplicación busca `tesseract` en PATH y en `C:/Program Files/Tesseract-OCR/`. Para una ubicación distinta puedes definir `TESSERACT_CMD` antes de arrancarla. Si faltan el programa o los idiomas, verás instrucciones en el resultado; los PDF con texto digital siguen funcionando.
 
-El OCR admite hasta **20 páginas sin texto por PDF**, 20 segundos por página y un presupuesto de 120 segundos por documento (además del tiempo de renderizado). Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
+El OCR admite hasta **1000 páginas sin texto por PDF**, 20 segundos por página y un presupuesto de 7200 segundos por documento (además del tiempo de renderizado). Renderiza a unos 200 ppp, reduciendo la resolución si hace falta para limitar la imagen a 8 millones de píxeles. PDFium se usa bajo un bloqueo porque no admite llamadas concurrentes. Tesseract recibe las imágenes por la entrada estándar y devuelve texto por la salida estándar: no se escriben imágenes temporales ni se envía contenido a internet. No se genera un PDF nuevo con capa de texto; el resultado se muestra en la aplicación y se exporta a JSON.
 
 ## Cómo funciona
 
@@ -67,7 +69,7 @@ El análisis es determinista. LangChain Core aporta la composición y los reinte
 
 ## Privacidad y funcionamiento local
 
-El servidor escucha únicamente en `127.0.0.1`, exige origen local para procesar y solo sirve los tres recursos públicos de `web/`. Documentos y resultados se mantienen en memoria, sin escribirlos al disco ni registrar su contenido. El navegador conserva los últimos resultados mientras la página siga abierta; solo la exportación crea un archivo descargado.
+El servidor escucha únicamente en `127.0.0.1`, exige origen local para procesar y solo sirve los tres recursos públicos de `web/`. Cada archivo se sube de forma binaria en bloques de 64 KiB y se guarda en una copia temporal local. Esa copia se elimina al terminar, fallar o cancelar; los resultados se mantienen en memoria durante hasta una hora (máximo 100 resultados anteriores). No se registra su contenido. Si el servidor se cierra durante un trabajo o se corta la alimentación, puede quedar una copia `documento-*` en la carpeta temporal del sistema; debe eliminarse manualmente. El navegador conserva los últimos resultados mientras la página siga abierta; solo la exportación crea un archivo descargado.
 
 No se hacen peticiones externas al procesar. LangSmith viene como dependencia de LangChain Core, pero el proyecto desactiva su trazado. La instalación inicial sí requiere internet para descargar paquetes. Este servidor está diseñado para uso local.
 
@@ -85,7 +87,8 @@ GitHub ejecuta las mismas comprobaciones al actualizar `main` o abrir una pull r
 
 - `processor.py`: validación, extracción y cadena de procesamiento por archivo. La validación queda fuera de los reintentos.
 - `ocr.py`: renderizado en memoria con PDFium y reconocimiento con Tesseract. Las llamadas a PDFium se serializan para evitar uso concurrente no admitido.
-- `app.py`: servidor HTTP local, límites de petición, validación de origen y procesamiento de lotes.
+- `app.py`: servidor HTTP local, subida binaria, consulta de progreso y cancelación.
+- `jobs.py`: cola local de hasta dos trabajos, un procesador simultáneo y limpieza de archivos temporales.
 - `web/`: interfaz sin servicios externos, con resultados aislados por documento y descarga JSON.
 - `tests/`: datos sintéticos y pruebas del dominio, del servidor y de integración con OCR.
 

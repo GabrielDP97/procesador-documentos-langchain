@@ -1,4 +1,4 @@
-"""Procesamiento determinista en memoria mediante LangChain Core."""
+"""Procesamiento determinista local mediante LangChain Core."""
 import base64
 import binascii
 import errno
@@ -7,7 +7,8 @@ import re
 import unicodedata
 from collections import Counter
 from io import BytesIO
-from pathlib import PurePath
+from pathlib import PurePath, Path
+from contextlib import ExitStack
 from pypdf import PdfReader
 from ocr import OcrError, recognize_pdf_pages
 
@@ -20,15 +21,16 @@ from langchain_core.runnables import RunnableLambda
 MAX_FILE_BYTES = 1024 * 1024
 MAX_FILES = 10
 MAX_ATTEMPTS = 3
-MAX_PDF_PAGES = 100
-MAX_PDF_STREAM_BYTES = 5 * 1024 * 1024
-MAX_PDF_TEXT_CHARACTERS = 1_000_000
+MAX_PDF_FILE_BYTES = 150 * 1024 * 1024
+MAX_PDF_PAGES = 1000
+MAX_PDF_STREAM_BYTES = 100 * 1024 * 1024
+MAX_PDF_TEXT_CHARACTERS = 5_000_000
 STOP_WORDS = set("""a al algo ante aquel aquí así aunque bajo cada como con contra cual
 cuando de del desde donde dos el ella ellas ellos en entre era es esa esas ese esos
 esta estaba estas este esto estos fue ha hasta hay la las le les lo los más me mi
 mientras muy ni no nos o otra otro para pero por porque que qué quien se ser si sin
 sobre son su sus también te tiene todo tras tu un una unas uno unos ya y the and of
-to in is it for on with as at be by from that this are was were an or not you your""".split())
+to in is it for on with as at be by from that this are was were an or not you your der die das den dem des ein eine einer einen einem eines und oder aber mit von zu im am auf aus ist sind war waren wird werden ich du er sie es wir ihr nicht auch als für an bei nach vor zum zur sich haben hat dem über noch wie nur so""".split())
 
 
 class ValidationError(ValueError):
@@ -39,21 +41,33 @@ class TransientProcessingError(Exception):
     """Operación temporalmente no disponible."""
 
 
-def extract_pdf(raw):
+def extract_pdf(raw, *, progress=None, cancel=None, languages="spa+eng"):
+    with ExitStack() as stack:
+        stream = stack.enter_context(open(raw, "rb")) if isinstance(raw, (str, Path)) else BytesIO(raw)
+        return _extract_pdf(raw, stream, progress, cancel, languages)
+
+
+def _extract_pdf(raw, stream, progress, cancel, languages):
     """Extrae texto de todas las páginas, sin ejecutar contenido del PDF."""
-    if not raw.lstrip().startswith(b"%PDF-"):
+    header = stream.read(32)
+    stream.seek(0)
+    if not header.lstrip().startswith(b"%PDF-"):
         raise ValidationError("El archivo no contiene un PDF válido. No basta con cambiar su extensión.")
     try:
-        reader = PdfReader(BytesIO(raw))
+        reader = PdfReader(stream)
         if reader.is_encrypted:
             raise ValidationError("El PDF está protegido. Guarda una copia sin contraseña para procesarlo.")
         page_count = len(reader.pages)
         if not 1 <= page_count <= MAX_PDF_PAGES:
-            raise ValidationError("El PDF debe tener entre 1 y 100 páginas.")
+            raise ValidationError(f"El PDF debe tener entre 1 y {MAX_PDF_PAGES} páginas.")
         texts, empty_pages = {}, []
         text_size = 0
         stream_size = 0
         for number, page in enumerate(reader.pages, start=1):
+            if cancel and cancel.is_set():
+                raise ValidationError("Procesamiento cancelado.")
+            if progress:
+                progress("Lectura PDF", number, page_count)
             contents = page.get_contents()
             stream_size += len(contents.get_data()) if contents is not None else 0
             if stream_size > MAX_PDF_STREAM_BYTES:
@@ -73,7 +87,7 @@ def extract_pdf(raw):
         ocr_issue = None
         if empty_pages:
             try:
-                recognized, issues = recognize_pdf_pages(raw, empty_pages)
+                recognized, issues = recognize_pdf_pages(raw, empty_pages, progress=progress, cancel=cancel, languages=languages)
                 attempted_pages = list(empty_pages)
                 for number in empty_pages:
                     text = recognized.get(number, "").strip()
@@ -104,7 +118,7 @@ def extract_pdf(raw):
         return {"text": "\n\n".join(texts[number] for number in sorted(texts)),
                 "source": {"format": "pdf", "pages": page_count, "pages_without_text": empty_pages,
                            "ocr_pages": ocr_pages, "ocr_attempted_pages": attempted_pages,
-                           "ocr_languages": ["spa", "eng"] if attempted_pages else []}, "warnings": warnings}
+                           "ocr_languages": languages.split("+") if attempted_pages else []}, "warnings": warnings}
     except ValidationError:
         raise
     except Exception as exc:
@@ -161,7 +175,7 @@ def analyze_document(document):
     }
 
 
-def process_upload(upload, *, simulate_transient=False, worker=analyze_document):
+def process_upload(upload, *, simulate_transient=False, worker=analyze_document, validator=validate_upload):
     attempts = 0
 
     def execute(document):
@@ -177,7 +191,7 @@ def process_upload(upload, *, simulate_transient=False, worker=analyze_document)
             raise
 
     # La validación queda fuera del tramo con reintentos.
-    pipeline = RunnableLambda(validate_upload) | RunnableLambda(execute).with_retry(
+    pipeline = RunnableLambda(validator) | RunnableLambda(execute).with_retry(
         retry_if_exception_type=(TransientProcessingError,),
         stop_after_attempt=MAX_ATTEMPTS,
         wait_exponential_jitter=True,
@@ -210,3 +224,23 @@ def process_batch(payload):
     return {"version": 1, "mode": "local-deterministic", "results": results,
             "summary": {"total": len(results), "ok": sum(r["status"] == "ok" for r in results),
                         "errors": sum(r["status"] == "error" for r in results)}}
+
+
+def process_file(path, name, *, languages="spa+eng", progress=None, cancel=None, simulate_transient=False):
+    """Ruta interna creada por el servidor; nunca procede del cliente."""
+    def validate(_):
+        if cancel and cancel.is_set():
+            raise ValidationError("Procesamiento cancelado.")
+        if PurePath(name).suffix.lower() == ".pdf":
+            if Path(path).stat().st_size > MAX_PDF_FILE_BYTES:
+                raise ValidationError("El PDF supera 150 MiB.")
+            return {"name": name, "bytes": Path(path).stat().st_size,
+                    **extract_pdf(str(path), languages=languages, progress=progress, cancel=cancel)}
+        return validate_upload({"name": name, "content": base64.b64encode(Path(path).read_bytes()).decode("ascii")})
+    def analyze(document):
+        if cancel and cancel.is_set():
+            raise ValidationError("Procesamiento cancelado.")
+        if progress:
+            progress("Análisis", 1, 1)
+        return analyze_document(document)
+    return process_upload({"name": name}, validator=validate, worker=analyze, simulate_transient=simulate_transient)

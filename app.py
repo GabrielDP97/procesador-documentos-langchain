@@ -1,4 +1,4 @@
-"""Servidor local, sin persistencia de documentos ni servicios externos."""
+"""Servidor local con documentos temporales y sin servicios externos."""
 import argparse
 import json
 import threading
@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from processor import ValidationError, process_batch
+from jobs import Jobs
 
 STATIC = Path(__file__).parent / "web"
 MAX_REQUEST_BYTES = 14 * 1024 * 1024
@@ -14,6 +15,14 @@ PROCESSING_SLOTS = threading.BoundedSemaphore(2)
 
 class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
+
+    def __init__(self, *args, **kwargs):
+        self.jobs = Jobs()
+        super().__init__(*args, **kwargs)
+
+    def server_close(self):
+        self.jobs.close()
+        super().server_close()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -49,6 +58,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Acceso local requerido."})
         if self.path == "/api/health":
             return self.reply(200, {"status": "ok"})
+        if self.path.startswith("/api/jobs/"):
+            value = self.server.jobs.snapshot(self.path.rsplit("/", 1)[-1])
+            return self.reply(200 if value else 404, value or {"error": "Trabajo no encontrado."})
         assets = {"/": ("index.html", "text/html; charset=utf-8"),
                   "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                   "/style.css": ("style.css", "text/css; charset=utf-8")}
@@ -62,6 +74,11 @@ class Handler(BaseHTTPRequestHandler):
         origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
         if not self.local_request() or self.headers.get("Origin") not in origins:
             return self.reply(403, {"error": "Abre la aplicación desde su dirección local."})
+        if self.path.startswith("/api/jobs/") and self.path.endswith("/cancel"):
+            found = self.server.jobs.cancel(self.path.split("/")[-2])
+            return self.reply(200 if found else 404, {"cancelled": found})
+        if self.path == "/api/jobs":
+            return self.upload_job()
         if self.path != "/api/process":
             return self.reply(404, {"error": "Ruta no encontrada."})
         if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -89,13 +106,44 @@ class Handler(BaseHTTPRequestHandler):
             PROCESSING_SLOTS.release()
 
 
+    def upload_job(self):
+        if self.headers.get("Content-Type") != "application/octet-stream":
+            return self.reply(415, {"error": "Se esperaba el archivo binario."})
+        job = None
+        try:
+            size = int(self.headers.get("Content-Length", "0"))
+            job = self.server.jobs.reserve(self.headers.get("X-File-Name", ""),
+                self.headers.get("X-OCR-Languages", "spa+eng"), size,
+                self.headers.get("X-Simulate", "false") == "true")
+            if job is None:
+                self.close_connection = True
+                return self.reply(429, {"error": "Hay dos trabajos activos. Espera a que terminen."})
+            remaining = size
+            while remaining:
+                block = self.rfile.read(min(65536, remaining))
+                if not block:
+                    raise ValidationError("La subida se ha interrumpido.")
+                job["handle"].write(block)
+                remaining -= len(block)
+            self.server.jobs.start(job)
+            token = job["id"]
+            job = None
+            self.reply(202, {"id": token})
+        except (ValueError, OSError) as exc:
+            self.close_connection = True
+            self.reply(400, {"error": str(exc) if isinstance(exc, ValidationError) else "No se ha completado la subida."})
+        finally:
+            if job is not None:
+                self.server.jobs.abandon(job)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Procesador local de documentos")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     with LocalServer(("127.0.0.1", args.port), Handler) as server:
         print(f"Aplicación disponible en http://127.0.0.1:{server.server_port}", flush=True)
-        print("Pulsa Ctrl+C para cerrar. Los documentos solo se mantienen en memoria.", flush=True)
+        print("Pulsa Ctrl+C para cerrar. Las copias temporales locales se eliminan al terminar cada trabajo.", flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:

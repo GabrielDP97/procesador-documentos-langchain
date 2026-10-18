@@ -39,8 +39,8 @@ class OcrTests(unittest.TestCase):
             self.assertIn("Instala Tesseract", result["error"])
 
     def test_ocr_page_limit(self):
-        with self.assertRaisesRegex(OcrError, "20 páginas"):
-            recognize_pdf_pages(b"", list(range(1, 22)))
+        with self.assertRaisesRegex(OcrError, "1000 páginas"):
+            recognize_pdf_pages(b"", list(range(1, 1002)))
 
     def test_timeout_is_reported(self):
         with patch("ocr.tesseract_command", return_value="tesseract"), patch("ocr.render_page", return_value=b"png"), patch("ocr.subprocess.run", side_effect=subprocess.TimeoutExpired("tesseract", 20)):

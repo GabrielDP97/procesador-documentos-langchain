@@ -56,10 +56,10 @@ class PdfTests(unittest.TestCase):
                 self.assertEqual(result["attempts"], 0)
 
     def test_page_and_extraction_limits(self):
-        for raw in [make_pdf([]), make_pdf(["Texto"] * 101)]:
+        for raw in [make_pdf([]), make_pdf(["Texto"] * 1001)]:
             result = process_upload(upload(raw, "paginas.pdf"))
             self.assertEqual(result["attempts"], 0)
-            self.assertIn("100 páginas", result["error"])
+            self.assertIn("1000 páginas", result["error"])
         raw = make_pdf()
         with patch("processor.MAX_PDF_TEXT_CHARACTERS", 2):
             self.assertIn("demasiado texto", process_upload(upload(raw, "largo.pdf"))["error"])
